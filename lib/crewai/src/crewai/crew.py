@@ -62,6 +62,15 @@ from crewai.events.types.crew_events import (
     CrewTrainFailedEvent,
     CrewTrainStartedEvent,
 )
+from crewai.events.types.organization_events import (
+    OpdrachtOntvangenEvent,
+    OpdrachtVoltooidEvent,
+    OpdrachtGeescaleerdEvent,
+    RapportVerstuurdEvent,
+    EscalatieGetriggerdEvent,
+    GoedkeuringVereistEvent,
+    PermissieGeweigerdEvent,
+)
 from crewai.flow.flow_trackable import FlowTrackable
 from crewai.knowledge.knowledge import Knowledge
 from crewai.knowledge.source.base_knowledge_source import BaseKnowledgeSource
@@ -413,6 +422,12 @@ class Crew(FlowTrackable, BaseModel):
     isolatie_modus: str = Field(
         default="open",
         description="Isolatie niveau: 'open', 'afdeling', of 'strikt'.",
+    )
+
+    # Raad van Commissarissen - menselijk toezicht
+    raad_van_commissarissen: Any | None = Field(
+        default=None,
+        description="Referentie naar RaadVanCommissarissen voor menselijk toezicht.",
     )
 
     @field_validator("id", mode="before")
@@ -2588,6 +2603,17 @@ To enable tracing, do any one of these:
             color="green",
         )
 
+        # Emit event
+        crewai_event_bus.emit(
+            self,
+            OpdrachtOntvangenEvent(
+                crew_id=self.id,
+                crew_naam=self.name,
+                afdeling_id=self.afdeling_id,
+                opdracht=opdracht,
+            ),
+        )
+
         if not voer_direct_uit:
             return True
 
@@ -2666,6 +2692,19 @@ To enable tracing, do any one of these:
                     color="green",
                 )
 
+                # Emit voltooid event
+                crewai_event_bus.emit(
+                    self,
+                    OpdrachtVoltooidEvent(
+                        crew_id=self.id,
+                        crew_naam=self.name,
+                        opdracht_id=getattr(opdracht, "id", None),
+                        opdracht_titel=getattr(opdracht, "titel", None),
+                        resultaat=resultaat_tekst if 'resultaat_tekst' in dir() else None,
+                        succes=True,
+                    ),
+                )
+
                 return True
 
             finally:
@@ -2690,6 +2729,17 @@ To enable tracing, do any one of these:
                     )
                 except Exception:
                     pass
+
+            # Emit escalatie event
+            crewai_event_bus.emit(
+                self,
+                OpdrachtGeescaleerdEvent(
+                    crew_id=self.id,
+                    crew_naam=self.name,
+                    opdracht_id=getattr(opdracht, "id", None),
+                    escalatie_reden=str(e),
+                ),
+            )
 
             return False
 
@@ -2815,6 +2865,19 @@ To enable tracing, do any one of these:
                 color="green",
             )
 
+            # Emit event
+            crewai_event_bus.emit(
+                self,
+                RapportVerstuurdEvent(
+                    crew_id=self.id,
+                    crew_naam=self.name,
+                    rapport_id=getattr(rapport, "id", None),
+                    rapport_titel=titel,
+                    naar_ids=list(ontvangers),
+                    rapport_type=type,
+                ),
+            )
+
             return rapport
 
         except Exception as e:
@@ -2868,6 +2931,17 @@ To enable tracing, do any one of these:
                 color="yellow",
             )
 
+            # Emit event
+            crewai_event_bus.emit(
+                self,
+                EscalatieGetriggerdEvent(
+                    crew_id=self.id,
+                    crew_naam=self.name,
+                    escalatie=escalatie,
+                    reden=reden,
+                ),
+            )
+
             return escalatie
 
         except Exception as e:
@@ -2910,6 +2984,19 @@ To enable tracing, do any one of these:
                     color="yellow",
                 )
 
+                # Emit event
+                crewai_event_bus.emit(
+                    self,
+                    PermissieGeweigerdEvent(
+                        crew_id=self.id,
+                        crew_naam=self.name,
+                        resource_type="crew",
+                        resource_id=resource_id,
+                        actie=actie,
+                        reden=reden,
+                    ),
+                )
+
             return toegestaan
 
         except Exception as e:
@@ -2919,6 +3006,81 @@ To enable tracing, do any one of these:
                 color="red",
             )
             # Bij fout, weiger toegang (fail-safe)
+            return False
+
+    def vraag_rvc_goedkeuring(
+        self,
+        type: str,
+        beschrijving: str,
+        details: dict[str, Any] | None = None,
+    ) -> bool:
+        """Vraag goedkeuring aan de Raad van Commissarissen.
+
+        Deze methode registreert een goedkeuringsverzoek bij de RvC.
+        De crew moet wachten op goedkeuring voordat de actie wordt uitgevoerd.
+
+        Args:
+            type: Type verzoek (opdracht, escalatie, budget, strategie).
+            beschrijving: Beschrijving van wat goedgekeurd moet worden.
+            details: Extra details over het verzoek.
+
+        Returns:
+            True als het verzoek is geregistreerd.
+
+        Example:
+            ```python
+            if crew.vraag_rvc_goedkeuring(
+                type="budget",
+                beschrijving="Verhoging trading limiet",
+                details={"nieuw_limiet": 100000}
+            ):
+                print("Verzoek ingediend, wacht op goedkeuring")
+            ```
+        """
+        if self.raad_van_commissarissen is None:
+            self._logger.log(
+                level="warning",
+                message="Geen RvC geconfigureerd voor goedkeuringsverzoek",
+                color="yellow",
+            )
+            return False
+
+        try:
+            self.raad_van_commissarissen.vraag_goedkeuring(
+                type=type,
+                beschrijving=beschrijving,
+                aanvrager_id=self.id,
+                aanvrager_naam=self.name or "Crew",
+                details=details or {},
+            )
+
+            self._logger.log(
+                level="info",
+                message=f"Goedkeuringsverzoek ingediend: {beschrijving[:50]}...",
+                color="green",
+            )
+
+            # Emit event
+            crewai_event_bus.emit(
+                self,
+                GoedkeuringVereistEvent(
+                    crew_id=self.id,
+                    crew_naam=self.name,
+                    verzoek_type=type,
+                    beschrijving=beschrijving,
+                    aanvrager_id=self.id,
+                    aanvrager_naam=self.name or "Crew",
+                ),
+            )
+
+            return True
+
+        except Exception as e:
+            self._logger.log(
+                level="error",
+                message=f"Fout bij goedkeuringsverzoek: {str(e)}",
+                color="red",
+            )
             return False
 
     def krijg_organisatie_tools(self) -> list[BaseTool]:

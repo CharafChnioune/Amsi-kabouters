@@ -1,11 +1,10 @@
 [project]
-name = "crewai247"
+name = "amsi-kabouters"
 dynamic = ["version"]
-description = "Enterprise AI Agent Framework - Fork van CrewAI met Nederlandse ondersteuning, hiërarchisch crew management, opdrachten/rapportages systeem en 24/7 operatie. Gebaseerd op CrewAI van Joao Moura."
+description = "Amsi Kabouters - Nederlands Enterprise AI Agent Framework met hiërarchische organisatiestructuur, Raad van Commissarissen interface, opdrachten/rapportages systeem en 24/7 operatie. Volledig in het Nederlands."
 readme = "README.md"
 authors = [
-    { name = "Charaf Chnioune" },
-    { name = "Joao Moura", email = "joao@crewai.com" }
+    { name = "Charaf Chnioune" }
 ]
 requires-python = ">=3.10, <3.14"
 dependencies = [
@@ -103,6 +102,7 @@ a2a = [
 
 
 [project.scripts]
+amsi = "crewai.cli.cli:crewai"
 crewai = "crewai.cli.cli:crewai"
 
 

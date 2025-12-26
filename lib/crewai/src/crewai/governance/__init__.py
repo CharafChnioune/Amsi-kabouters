@@ -76,6 +76,14 @@ from crewai.governance.escalation import (
     # Helper functies
     maak_standaard_escalatie_regels,
 )
+from crewai.governance.raad_van_commissarissen import (
+    # Enums
+    GoedkeuringsStatus,
+    # Klassen
+    GoedkeuringsVerzoek,
+    RvCBericht,
+    RaadVanCommissarissen,
+)
 
 __all__ = [
     # Access control types
@@ -105,4 +113,9 @@ __all__ = [
     "EscalatieRegel",
     # Escalation helpers
     "maak_standaard_escalatie_regels",
+    # Raad van Commissarissen
+    "GoedkeuringsStatus",
+    "GoedkeuringsVerzoek",
+    "RvCBericht",
+    "RaadVanCommissarissen",
 ]

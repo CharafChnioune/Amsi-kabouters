@@ -1,6 +1,4 @@
-import threading
 from typing import Any
-import urllib.request
 import warnings
 
 from crewai.agent.core import Agent
@@ -14,7 +12,6 @@ from crewai.process import Process
 from crewai.task import Task
 from crewai.tasks.llm_guardrail import LLMGuardrail
 from crewai.tasks.task_output import TaskOutput
-from crewai.telemetry.telemetry import Telemetry
 
 
 def _suppress_pydantic_deprecation_warnings() -> None:
@@ -40,48 +37,27 @@ def _suppress_pydantic_deprecation_warnings() -> None:
 
 _suppress_pydantic_deprecation_warnings()
 
-__version__ = "1.7.2"
-_telemetry_submitted = False
-
-
-def _track_install() -> None:
-    """Track package installation/first-use via Scarf analytics."""
-    global _telemetry_submitted
-
-    if _telemetry_submitted or Telemetry._is_telemetry_disabled():
-        return
-
-    try:
-        pixel_url = "https://api.scarf.sh/v2/packages/CrewAI/crewai/docs/00f2dad1-8334-4a39-934e-003b2e1146db"
-
-        req = urllib.request.Request(pixel_url)  # noqa: S310
-        req.add_header("User-Agent", f"CrewAI-Python/{__version__}")
-
-        with urllib.request.urlopen(req, timeout=2):  # noqa: S310
-            _telemetry_submitted = True
-    except Exception:  # noqa: S110
-        pass
-
-
-def _track_install_async() -> None:
-    """Track installation in background thread to avoid blocking imports."""
-    if not Telemetry._is_telemetry_disabled():
-        thread = threading.Thread(target=_track_install, daemon=True)
-        thread.start()
-
-
-_track_install_async()
+__version__ = "1.0.0"
+__package_name__ = "amsi-kabouters"
+__description__ = "Nederlands Enterprise AI Agent Framework"
 __all__ = [
-    "LLM",
+    # Core
     "Agent",
-    "BaseLLM",
     "Crew",
-    "CrewOutput",
+    "Task",
     "Flow",
+    "Process",
+    # LLM
+    "LLM",
+    "BaseLLM",
+    # Output
+    "CrewOutput",
+    "TaskOutput",
+    # Knowledge & Guards
     "Knowledge",
     "LLMGuardrail",
-    "Process",
-    "Task",
-    "TaskOutput",
+    # Package info
     "__version__",
+    "__package_name__",
+    "__description__",
 ]
